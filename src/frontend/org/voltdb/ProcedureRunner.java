@@ -1430,7 +1430,7 @@ public class ProcedureRunner {
         final VoltTable[] m_results;
 
         BatchState(int batchSize, MpTransactionState txnState, long siteId, boolean finalTask, String procedureName,
-                byte[] procToLoad, boolean perFragmentStatsRecording) {
+                byte[] procToLoad, boolean perFragmentStatsRecording, int maxMpResponseSize) {
             m_batchSize = batchSize;
             m_txnState = txnState;
 
@@ -1453,6 +1453,8 @@ public class ProcedureRunner {
             m_distributedTask.setProcNameToLoad(procToLoad);
             m_distributedTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
             m_distributedTask.setPerFragmentStatsRecording(perFragmentStatsRecording);
+
+            m_distributedTask.setMaxResponseSize(maxMpResponseSize);
         }
 
         /*
@@ -1508,8 +1510,10 @@ public class ProcedureRunner {
     VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
         MpTransactionState txnState = (MpTransactionState)m_txnState;
         assert(txnState != null);
+        long perPartitionMaxResponse = m_site.getMaxTotalMpResponseSize() / txnState.getMasterHSIDs().size();
         BatchState state = new BatchState(batch.size(), txnState, m_site.getCorrespondingSiteId(), finalTask,
-                m_procedureName, m_procNameToLoadForFragmentTasks, m_perCallStats.samplingStmts());
+                m_procedureName, m_procNameToLoadForFragmentTasks, m_perCallStats.samplingStmts(),
+                (int) Math.min(perPartitionMaxResponse, Integer.MAX_VALUE));
 
         // iterate over all sql in the batch, filling out the above data
         // structures
